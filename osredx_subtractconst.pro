@@ -78,11 +78,13 @@ for i = 0, nframes-1 do begin
 ; image of source fall in region used for median, and when
 ; source is faint compared to the background
   medval=1.
+  medvec=fltarr(nspec)
 
   for k = 0, (nspec-1) do begin
     temp=dat[*,*,k]
     ; Calculate the median
     medval=median(temp[where(mask eq 0)])
+    medvec[k]=medval
     ; And subtract the median from these good pixel values
 ;    print,'WARNING: MODDED!'
 ;    medval=meanclipdrl(temp[where(badpix eq 0)])
@@ -95,6 +97,8 @@ for i = 0, nframes-1 do begin
     dat[*,*,k]=temp
   endfor
 
+  plot,medvec
+  
   ; Zap hot pixels??
   if keyword_set(zaphot) then begin
     for l=0,nx-1 do begin

@@ -25,6 +25,9 @@ Forward_Function ORFC_lam, ORFC_dlam, ORFC_ABvega
 function ORFC_lam,Channel,filter
   temp=0.
   case Filter of
+    'Hn2':begin
+       temp=15320+Channel*2.0
+    end
     'Hn4':begin
        temp=16520+Channel*2.0
     end
@@ -58,6 +61,9 @@ end
 function ORFC_dlam,filter
   temp=0.
   case Filter of
+    'Hn2':begin
+      temp=2.0
+    end
     'Hn4':begin
       temp=2.0
     end
@@ -91,6 +97,9 @@ end
 function ORFC_ABvega,filter
   temp=0.
   case Filter of
+    'Hn2':begin
+      temp=1.37
+    end
     'Hn4':begin
       temp=1.37
     end
@@ -199,6 +208,10 @@ if (~keyword_set(NOTELL)) then begin
   vegalam=vegaspec[0,*]
 
   vegaresamp=interpol(vegaspec[1,*],vegalam,lambda)
+
+  plot,lambda,tellspec
+  oplot,lambda,vegaresamp*median(tellspec)/median(vegaresamp),color=250
+
   tellspec_div=tellspec/vegaresamp
   tellspec_div=tellspec_div/median(tellspec_div)
   if (keyword_set(verbose)) then writefits,'tellspec_div.fits',tellspec_div
@@ -235,6 +248,16 @@ calmag_ang=calmag_hz*c/(lambda*1e-8)/(lambda*1e-8)/1e8
 ; My calibration factor is the median of the ratio between observed
 ; spectrum and the nominal spectrum
 calfac=median(calmag_ang/calspec_cor)
+
+
+; Make some plots for QA
+window, 0
+plot,lambda,calspec_orig; Original calibration star spectrum
+oplot,lambda,tellspec_div*median(calspec_orig)/median(tellspec_div),color=250; Telluric spectrum
+window,1
+plot,lambda,calspec_cor*calfac; Calibrated star spectrum
+oplot,lambda,calmag_ang,color=250 ; Nominal magnitude star spectrum
+
 print,'calfac=',calfac
 
 ; Now apply the calibration factors to the science data
@@ -247,8 +270,8 @@ if (~keyword_set(nowrite)) then begin
     dat=transpose(dat,[2,1,0])
     noise=transpose(noise,[2,1,0])
     for j=0,nspec-1 do begin
-      dat[*,*,j]=dat[*,*,j]*calfac*corvec[j]
-      noise[*,*,j]=noise[*,*,j]*calfac*corvec[j]
+      dat[*,*,j]=dat[*,*,j]*calfac*corvec[j]/tellspec_div[j]
+      noise[*,*,j]=noise[*,*,j]*calfac*corvec[j]/tellspec_div[j]
     endfor
     dat=transpose(dat,[2,1,0])*1d17; Convert to 1e-17 cgs
     noise=transpose(noise,[2,1,0])*1d17
