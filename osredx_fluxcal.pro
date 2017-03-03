@@ -28,6 +28,9 @@ function ORFC_lam,Channel,filter
     'Hn2':begin
        temp=15320+Channel*2.0
     end
+    'Hn3':begin
+       temp=15940+Channel*2.0
+    end
     'Hn4':begin
        temp=16520+Channel*2.0
     end
@@ -51,6 +54,7 @@ function ORFC_lam,Channel,filter
     end
     else:begin
        print,'Error: invalid filter'
+       stop
     end
  endcase
 
@@ -64,6 +68,9 @@ function ORFC_dlam,filter
     'Hn2':begin
       temp=2.0
     end
+    'Hn3':begin
+      temp=2.0
+    end
     'Hn4':begin
       temp=2.0
     end
@@ -87,6 +94,7 @@ function ORFC_dlam,filter
     end
     else:begin
        print,'Error: invalid filter'
+       stop
     end
  endcase
 
@@ -100,6 +108,9 @@ function ORFC_ABvega,filter
     'Hn2':begin
       temp=1.37
     end
+    'Hn3':begin
+      temp=1.37
+    end
     'Hn4':begin
       temp=1.37
     end
@@ -123,6 +134,7 @@ function ORFC_ABvega,filter
     end
     else:begin
        print,'Error: invalid filter'
+       stop
     end
  endcase
 
@@ -181,7 +193,8 @@ vegadir=concat_dir(ml_getenv('OSIRISTOOLS_DIR'),'vegaspec/')
 if ((filter eq 'Hn1')or(filter eq 'Hn2')or(filter eq 'Hn3')or(filter eq 'Hn4')or(filter eq 'Hn5')) then $
   vegaspec=readfits(vegadir+'vega_2d_h.fits')
 if ((filter eq 'Kn1')or(filter eq 'Kn2')or(filter eq 'Kn3')or(filter eq 'Kn4')or(filter eq 'Kn5')) then $
-  vegaspec=readfits(vegadir+'vega_2d_k.fits')
+   vegaspec=readfits(vegadir+'vega_2d_k.fits')
+; Units are per Angstrom
 
 ; Default telluric correction vector is 1.0 everywhere
 tellspec_div=replicate(1.0,nspec)
@@ -208,12 +221,14 @@ if (~keyword_set(NOTELL)) then begin
   vegalam=vegaspec[0,*]
 
   vegaresamp=interpol(vegaspec[1,*],vegalam,lambda)
-
-  plot,lambda,tellspec
-  oplot,lambda,vegaresamp*median(tellspec)/median(vegaresamp),color=250
-
   tellspec_div=tellspec/vegaresamp
   tellspec_div=tellspec_div/median(tellspec_div)
+  
+  window,0
+  plot,lambda,tellspec,title='Black=Telluric star, Red=Vega spectrum, Mag=Telluric vector'
+  oplot,lambda,vegaresamp*median(tellspec)/median(vegaresamp),color=250
+  oplot,lambda,tellspec_div*median(tellspec),color=150
+
   if (keyword_set(verbose)) then writefits,'tellspec_div.fits',tellspec_div
 endif
 
@@ -251,11 +266,11 @@ calfac=median(calmag_ang/calspec_cor)
 
 
 ; Make some plots for QA
-window, 0
-plot,lambda,calspec_orig; Original calibration star spectrum
+window, 1
+plot,lambda,calspec_orig,title='Black=Cal spectrum, Red=Tell spectrum'; Original calibration star spectrum
 oplot,lambda,tellspec_div*median(calspec_orig)/median(tellspec_div),color=250; Telluric spectrum
-window,1
-plot,lambda,calspec_cor*calfac; Calibrated star spectrum
+window,2
+plot,lambda,calspec_cor*calfac,title='Black=Cor Cal spectrum, Red=Nom spectrum'; Calibrated star spectrum
 oplot,lambda,calmag_ang,color=250 ; Nominal magnitude star spectrum
 
 print,'calfac=',calfac
