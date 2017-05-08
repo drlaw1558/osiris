@@ -1,0 +1,172 @@
+IFsim Version 2.2
+
+IDL program to simulate OSIRIS observations of high-redshift
+emission line sources.
+This code has been written and tested on an Intel Mac running
+OS X 10.5.8 and 64-bit IDL version 7.0.4
+
+How to use it:
+
+- You absolutely must have the NASA Astrolib routines installed
+in your IDL directory.  Get them from 
+http://idlastro.gsfc.nasa.gov/ftp/astron.dir.tar.gz
+If you get compilation errors on IFsim, it's probably because
+the astrolib routines couldn't be found.
+
+- Modify the line in the IFsim_v2.pro file which specifies
+the location of IFparam_Keck on your system.  Just search for
+IFparam_Keck to find the right line.  This file tells the code all of
+the specifics to Keck/OSIRIS which it should use.
+
+- Modify the filepaths to IFsim_irbg.dat and IFsim_irtrans.dat
+in IFparam_Keck as necessary.  These specify the IR background
+and sky transmission spectrum.
+
+- Generally you won't want to modify anything else in 
+IFparam_Keck, except perhaps the single exposure length.  For
+faint extragalactic sources you're probably using 900 seconds.
+
+- Compile and run IFsim_v2.pro, it should walk you through all of the
+simulation input steps.
+
+- It will ask you to specify 3 output files.  The first is an
+estimate S/N map for each lenslet.  The second is a simulated data
+cube in OSIRIS-type lambda,y,x format.  The 3rd is just like the
+2nd, but smoothed with a spatial gaussian kernel that can help
+clean up images somewhat.
+
+- More detail information on what the code is doing can be found
+in the fairly extensive commentary through the .pro file.
+
+- A word of caution: if you examine the output data cubes with the
+quicklook2 package used for real OSIRIS data, quicklook2 is likely
+to crash if you interact too much with the 'depth plot' option.
+This is because ql2 looks for keyword information in the FITS 
+headers which is not present in the simulated data cubes, and
+crashes when it can't find the wavelength information.  This may
+be fixed in a later release if somebody comes up with a convenient
+way to do so.
+
+This code is provided as-is, without any guarantees that it will
+compile on your OS, not conflict with previous IDL routines that you
+hae installed, or provide perfectly accurate results in all
+configurations that you can think of to use it.  In fact, in some
+cases it might be plain wrong.  You should read all the comments in
+the main program if you want to know how any particular piece works,
+or how to use the code with your science program, there's a lot of
+information in there that isn't reproduced in this brief readme.
+
+Most likely, it should give a pretty good estimate of the performance 
+of OSIRIS for observations of extended, emission-line sources *subject* 
+to a number of important  assumptions which were made along the way 
+in developing the code.  To a degree it should do well enough for 
+point sources, but isn't intended to work with absorption line or 
+continuum observations.
+
+Some of these assumptions include:
+
+- It's your responsibility to make sure you don't give the code
+bad inputs.  If it asks you for a lenslet scale in mas 
+(i.e. 0.05 or 0.1), don't blame me if you get weird results from
+entering '100' or 'fifty'.  Similarly, you should make sure that
+your line falls in the wavelength range covered by OSIRIS filters
+before using this code.  I haven't written failsafe warning routines
+to cover every possible wacky argument that somebody could feed in.
+
+- When it scales an input FITS file by a total line flux, it sums the
+pixel values and assumes that the total corresponds to your total
+line flux.  If your object is poorly background subtracted, this can
+cause significant effects on the actual amount of flux in what you think
+is really your object.  Read the subroutines (MakeFluxMap, MakeFluxMap2)
+if you're in doubt.
+
+- Similarly, if there are other sources that fall within the field of view,
+these will be included in the flux assignment.  I don't know which
+pieces are really the source you're interested in, and neither does
+the code.
+
+- S/N ratios are subject to debate over what they precisely mean,
+and can vary significantly depending on whether your emission line
+happened to land on/near a night-sky OH line.
+
+- S/N ratios are also slightly misleading.  While they are S/N for
+a spectrum in a given lenslet, this lenslet is going to be correlated
+with the lenslets around it because of the finite size of your PSF.
+This means you can't always expect to bin a bunch of lenslets and get
+a much better quality composite spectrum.
+
+- The input transmission and sky background spectrum aren't perfectly
+matched to the OSIRIS spectral resolution, they have R ~ 1400 (I think)
+instead.  Thermal background from optical surfaces is included with a
+Planck function of temperature and emissivity specified in the parameter file.
+
+- Both the two-component and Moffat PSF models are rough guesses,
+and the actual PSF may not be very close to these on a given night.
+The Moffat profile I've found to be a pretty decent empirical
+fit to the PSF I've got in K-band with good strehl LGS observations.
+
+- The S/N map is also quite sensitive to what you call 'signal'.  It
+isn't always obvious what this is.  Is flux from the seeing halo
+of a piece on the far side of your object going to contribute to how 
+well you can detect line emission?  If it's at the same wavelength
+(i.e. the same relative velocity) then yes, otherwise not necessarily.
+Modelling this complicated effect requires a velocity model for the
+source.  This is not included in the first routine, which simply
+assumes that both core and halo light of the PSF constitute 'signal'.
+In the second routine, an input velocity map is used to do this
+calculation more accurately.
+
+- The sample data cubes do not have the actual spectral length of
+the real data, nor do the emission lines lie at accurate spectral
+channels in the cubes for the specified filter setup.  
+There are not extra lines generated, only a single
+line.  In every case the line will be centered at spectral pixel
+# 200, and the model cube is designed simply to give a rough idea
+of what kind of thing you might see in the OSIRIS data.  You'll 
+probably give yourself seizures if you try to interpret the spectra
+of individual model lenslets too closely to the predicted S/N map.
+
+- The field of view is not a perfect match to OSIRIS.  The Kn3 FOV 
+is actually larger than Kn1, but this variation is not modelled.
+
+- The code has only been tested for 50 and 100 mas lenslet scales,
+in H and K narrowband filters and faint objects ~ 1e-16 cgs fluxes.
+Any other bands and setups are included only because they were easy
+to code and the results have not been checked against observations,
+or even tried at all in many cases.  I.e., beware especially if you're
+looking at a bright star in z-band with the 20 mas scale...
+
+Some sample uses:
+
+1) Using option '1' in the code:
+Take a FITS image of your source, and see roughly what S/N you'd expect
+when observing line emission with OSIRIS, and what the data cube might look like.
+This doesn't account for any velocity information, it effectively assumes
+that everything is at 0 relative velocity.
+
+  './idl'
+  '.r IFsim_v2.pro'
+  Follow sample1.input.jpg directions, you should get output files
+  that look like sample1.SN.fits, sample1.cube.fits, sample1.SmthCube.fits
+
+2) Using option '2' in the code:
+Take a flux map, a velocity map, and a velocity dispersion map
+(which you've made using some means) and calculate what OSIRIS should
+see.  Much the same as above, but everything should now be propagated
+through the system as a function of wavelength.  Doing this can fail
+more easily though, since there are more places to go wrong.
+
+In this example, I just constructed two point sources in the field,
+with a slightly different velocity relative to systemic, and a different
+velocity dispersion.
+
+  './idl'
+  '.r IFsim_v2.pro'
+  Follow sample2.input.jpg directions, you should get output files
+  that look like sample2.cube.fits and sample2.SmthCube.fits
+
+You can see how they look in the OSIRIS cube- convolved with the PSF,
+and accounting for different line widths.
+
+In principle, any more complicated system could be input, such
+as a flux/velocity/sigma map for a galaxy.

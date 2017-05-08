@@ -1,0 +1,25 @@
+1000.	Telescope diameter (cm)
+3600	Spectral resolution (3800 at most lenslet scales, 3400 at 0.1'')
+3	N1
+1600	N2
+0.03	Dark current (e-/s/pixel) 0.03 normally
+3	Read noise/pixel (MCDS) 3 normally
+900	Single exposure length (s)
+272	Temperature of AO system (K)
+272	Temperature of telescope (K)
+0.65	AO system transmission (0.65)
+0.56	Partial system transmission (Spectrograph optical components, minus filters, grating)
+0.8     Telescope transmission(0.8)
+0.7	Seeing in V-band (arcseconds)
+337	Net wavefront error (nm), based on http://www2.keck.hawaii.edu/optics/lgsao/performance.html (achieved Strehl), 337 best guess
+/Users/drlaw/GenCode/IDL/IFsim/IFsim_irbg.dat
+/Users/drlaw/GenCode/IDL/IFsim/IFsim_irtrans.dat
+0.8	Filter throughput (not used)
+0.35	AO emissivity (1-AO transmission above)
+0.2     Telescope emissivity (1-Tel transmission above)
+95.      Moffat profile alpha (mas)
+
+Intention is that the parameters in this file remain fixed in all routines.
+If you want to change a value given in this file, you should have a good reason for it.
+Not all values are independent, e.g. if you change AO transmission, AO emissivity must also be changed manually.
+Parameters that can vary (e.g. redshift) must be determined when running program.
