@@ -275,9 +275,9 @@ sigma_ll=(minsig/c)*lambda_guess; Lower limit on sigma in Angstrom
 sigma_ul=(maxsig/c)*lambda_guess; Upper limit on sigma in Angstrom
 
 ; Parameters are [wavelength, sigma, amplitude, baseline]
-parinfo[*].value = [lambda_guess, 5., 0.01, 0.]; starting values
+parinfo[*].value = [lambda_guess, 6., 0.01, 0.]; starting values
 ; Initial guess
-parms0=[lambda_guess, 5., 0.1, 0.]
+parms0=[lambda_guess, 6., 0.1, 0.]
 ;Bound the velocities
 parinfo[0].limited[0] = 1
 parinfo[0].limited[1] = 1
@@ -326,7 +326,7 @@ for i=0,(ngood<100)-1 do begin
   ; be below instrumental resolution in Angstroms
   thisR=c/lsfmap[goodx[i],goody[i]]/2.35
   if (minsig lt 0) then $
-    parinfo[1].limits[0]=lambda_guess/skyR/2.35
+    parinfo[1].limits[0]=lambda_guess/thisR/2.35
 
   ; First fit uses the input error spectrum
   if (ltype eq 'o3double') then $
@@ -359,14 +359,16 @@ for i=0,ngood-1 do begin
     skyR=fit_skyspec(wavevec, skyspec); spectral resolution
     thislsf=c/skyR/2.35
     lsfmap[goodx[i],goody[i]]=thislsf; lsf map of sigma in km/s
-  endif
+  endif else begin
+    thislsf=lsfmap[goodx[i],goody[i]]
+  endelse
 
   ; If minsig parameter was less than zero, update
   ; the bounded range for the fitter so that sigma cannot
   ; be below instrumental resolution in Angstroms
   thisR=c/lsfmap[goodx[i],goody[i]]/2.35
   if (minsig lt 0) then $
-    parinfo[1].limits[0]=lambda_guess/skyR/2.35
+    parinfo[1].limits[0]=lambda_guess/thisR/2.35
   
   ; Re-fit using covariance-corrected error spectrum
   if (ltype eq 'o3double') then $
@@ -437,6 +439,8 @@ for i=0,ngood-1 do begin
   if ((keyword_set(verbose))and(snmap[goodx[i],goody[i]] gt sncut)) then begin
     plot,wavevec,spectrum
     oplot,wavevec,yfit,color=250
+    thestring=strcompress('SNR = '+string(snmap[goodx[i],goody[i]]))
+    xyouts,median(wavevec),median(spectrum)+2/3.*(max(spectrum)-median(spectrum)),thestring,color=250,charsize=2
     wait, 1.0
   endif
 endfor
@@ -458,23 +462,27 @@ if (keyword_set(verbose)) then splog,'nhighsn_all=',nhighsn_all
 
 ; Composite spectrum of low-dispersion regions
 indx_low=where((snmap gt sncut)and(sigmap lt 300.),nhighsn_low)
-ind_low=array_indices(snmap,indx_low)
-goodx_low=ind_low[0,*]
-goody_low=ind_low[1,*]
-sumspec_low=fltarr(nz)
-for i=0,nhighsn_low-1 do $
-  sumspec_low += newflux[goodx_low[i],goody_low[i],*]
-if (keyword_set(verbose)) then splog,'nhighsn_low=',nhighsn_low
+if (nhighsn_low gt 0) then begin
+  ind_low=array_indices(snmap,indx_low)
+  goodx_low=ind_low[0,*]
+  goody_low=ind_low[1,*]
+  sumspec_low=fltarr(nz)
+  for i=0,nhighsn_low-1 do $
+    sumspec_low += newflux[goodx_low[i],goody_low[i],*]
+  if (keyword_set(verbose)) then splog,'nhighsn_low=',nhighsn_low
+endif
 
 ; Composite spectrum of high-dispersion regions
 indx_high=where((snmap gt sncut)and(sigmap ge 300.),nhighsn_high)
-ind_high=array_indices(snmap,indx_high)
-goodx_high=ind_high[0,*]
-goody_high=ind_high[1,*]
-sumspec_high=fltarr(nz)
-for i=0,nhighsn_high-1 do $
-  sumspec_high += newflux[goodx_high[i],goody_high[i],*]
-if (keyword_set(verbose)) then splog,'nhighsn2=',nhighsn_high
+if (nhighsn_high gt 0) then begin
+  ind_high=array_indices(snmap,indx_high)
+  goodx_high=ind_high[0,*]
+  goody_high=ind_high[1,*]
+  sumspec_high=fltarr(nz)
+  for i=0,nhighsn_high-1 do $
+    sumspec_high += newflux[goodx_high[i],goody_high[i],*]
+  if (keyword_set(verbose)) then splog,'nhighsn_high=',nhighsn_high
+endif
 
 ; Median sky spectrum across all high snr regions
 if (keyword_set(skyfile)) then begin
@@ -489,6 +497,8 @@ endif
 ; Fit the composite spectra
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Need to use round() on covar; otherwise get some odd numerical artifacts that
+; are not meaningful
 
 ; Fit the composite spectrum of all regions
 ; First fit uses incorrect error spectrum (not scaled)
@@ -499,19 +509,27 @@ if (ltype eq 'single') then $
 ; Derive error correction term to account for coadded covariant spectra
 diff=sumspec_all-yfit_all
 rms=sqrt((moment(diff/errspec))[1])
-covar=rms*sqrt(fxpar(hdr0,'CDELT1')*10.)
+covar=round(rms*sqrt(fxpar(hdr0,'CDELT1')*10.))
 ; Second fit uses corrected errors
 if (ltype eq 'o3double') then $
-  parms_all=mpfitfun('o3_twocomponent',wavevec,sumspec_all,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_all,perror=perr_all,/quiet)
+  parms_all=mpfitfun('o3_twocomponent',wavevec,sumspec_all,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_all,perror=perr_all,/quiet,bestnorm=bestnorm,dof=dof)
 if (ltype eq 'single') then $
-  parms_all=mpfitfun('onecomponent',wavevec,sumspec_all,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_all,perror=perr_all,/quiet)
+  parms_all=mpfitfun('onecomponent',wavevec,sumspec_all,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_all,perror=perr_all,/quiet,bestnorm=bestnorm,dof=dof)
 theflux=parms_all[2]*parms_all[1]*sqrt(2*!PI)
 dflux=theflux*sqrt((perr_all[2]/parms_all[2])^2 + (perr_all[1]/parms_all[1])^2)*sqrt(bestnorm/dof)
+thevel=(parms_all[0]-lambda_guess)/lambda_guess*3e5
+thevel_err=(perr_all[0])/lambda_guess*3e5*sqrt(bestnorm/dof)
+thesig=(parms_all[1])/parms_all[0]*3e5
+thesig_err=perr_all[1]/parms_all[0]*3e5*sqrt(bestnorm/dof)
 splog,'Sum_all flux: ',theflux/10.,' +- ',dflux/10.,' e-16 erg/s/cm2'
+splog,strcompress('Sum_all wave: '+string(parms_all[0])+' um, (z='+string(parms_all[0]/lrest-1.)+')')
+splog,'Sum_all velocity: ',thevel,' +- ',thevel_err,' km/s'
+splog,'Sum_all sigma: ',thesig,' +- ',thesig_err,' km/s'
 splog,'SNR: ',theflux/dflux
 
 ; Fit the composite spectrum of low sigma regions
 ; First fit uses incorrect error spectrum (not scaled)
+if (nhighsn_low gt 0) then begin
 if (ltype eq 'o3double') then $
   parms_low=mpfitfun('o3_twocomponent',wavevec,sumspec_low,errspec,parms0,parinfo=parinfo,yfit=yfit_low,perror=perr_low,/quiet)
 if (ltype eq 'single') then $
@@ -519,19 +537,28 @@ if (ltype eq 'single') then $
 ; Derive error correction term to account for coadded covariant spectra
 diff=sumspec_low-yfit_low
 rms=sqrt((moment(diff/errspec))[1])
-covar=rms*sqrt(fxpar(hdr0,'CDELT1')*10.)
+covar=round(rms*sqrt(fxpar(hdr0,'CDELT1')*10.))
 ; Second fit uses corrected errors
 if (ltype eq 'o3double') then $
-  parms_low=mpfitfun('o3_twocomponent',wavevec,sumspec_low,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_low,perror=perr_low,/quiet)
+  parms_low=mpfitfun('o3_twocomponent',wavevec,sumspec_low,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_low,perror=perr_low,/quiet,bestnorm=bestnorm,dof=dof)
 if (ltype eq 'single') then $
-  parms_low=mpfitfun('onecomponent',wavevec,sumspec_low,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_low,perror=perr_low,/quiet)
+  parms_low=mpfitfun('onecomponent',wavevec,sumspec_low,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_low,perror=perr_low,/quiet,bestnorm=bestnorm,dof=dof)
 theflux=parms_low[2]*parms_low[1]*sqrt(2*!PI)
 dflux=theflux*sqrt((perr_low[2]/parms_low[2])^2 + (perr_low[1]/parms_low[1])^2)*sqrt(bestnorm/dof)
+thevel=(parms_low[0]-lambda_guess)/lambda_guess*3e5
+thevel_err=(perr_low[0])/lambda_guess*3e5*sqrt(bestnorm/dof)
+thesig=(parms_low[1])/parms_low[0]*3e5
+thesig_err=perr_low[1]/parms_low[0]*3e5*sqrt(bestnorm/dof)
 splog,'Sum_low flux: ',theflux/10.,' +- ',dflux/10.,' e-16 erg/s/cm2'
+splog,strcompress('Sum_low wave: '+string(parms_low[0])+' um, (z='+string(parms_low[0]/lrest-1.)+')')
+splog,'Sum_low velocity: ',thevel,' +- ',thevel_err,' km/s'
+splog,'Sum_low sigma: ',thesig,' +- ',thesig_err,' km/s'
 splog,'SNR: ',theflux/dflux
+endif
 
-; Fit the composite spectrum of low sigma regions
+; Fit the composite spectrum of high sigma regions
 ; First fit uses incorrect error spectrum (not scaled)
+if (nhighsn_high gt 0) then begin
 if (ltype eq 'o3double') then $
   parms_high=mpfitfun('o3_twocomponent',wavevec,sumspec_high,errspec,parms0,parinfo=parinfo,yfit=yfit_high,perror=perr_high,/quiet)
 if (ltype eq 'single') then $
@@ -539,29 +566,44 @@ if (ltype eq 'single') then $
 ; Derive error correction term to account for coadded covariant spectra
 diff=sumspec_high-yfit_high
 rms=sqrt((moment(diff/errspec))[1])
-covar=rms*sqrt(fxpar(hdr0,'CDELT1')*10.)
+covar=round(rms*sqrt(fxpar(hdr0,'CDELT1')*10.))
 ; Second fit uses corrected errors
 if (ltype eq 'o3double') then $
-  parms_high=mpfitfun('o3_twocomponent',wavevec,sumspec_high,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_high,perror=perr_high,/quiet)
+  parms_high=mpfitfun('o3_twocomponent',wavevec,sumspec_high,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_high,perror=perr_high,/quiet,bestnorm=bestnorm,dof=dof)
 if (ltype eq 'single') then $
-  parms_high=mpfitfun('onecomponent',wavevec,sumspec_high,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_high,perror=perr_high,/quiet)
+  parms_high=mpfitfun('onecomponent',wavevec,sumspec_high,errspec*covar,parms0,parinfo=parinfo,yfit=yfit_high,perror=perr_high,/quiet,bestnorm=bestnorm,dof=dof)
 theflux=parms_high[2]*parms_high[1]*sqrt(2*!PI)
 dflux=theflux*sqrt((perr_high[2]/parms_high[2])^2 + (perr_high[1]/parms_high[1])^2)*sqrt(bestnorm/dof)
+thevel=(parms_high[0]-lambda_guess)/lambda_guess*3e5
+thevel_err=(perr_high[0])/lambda_guess*3e5*sqrt(bestnorm/dof)
+thesig=(parms_high[1])/parms_high[0]*3e5
+thesig_err=perr_high[1]/parms_high[0]*3e5*sqrt(bestnorm/dof)
 splog,'Sum_high flux: ',theflux/10.,' +- ',dflux/10.,' e-16 erg/s/cm2'
+splog,strcompress('Sum_high wave: '+string(parms_high[0])+' um, (z='+string(parms_high[0]/lrest-1.)+')')
+splog,'Sum_high velocity: ',thevel,' +- ',thevel_err,' km/s'
+splog,'Sum_high sigma: ',thesig,' +- ',thesig_err,' km/s'
 splog,'SNR: ',theflux/dflux
+endif
+
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Write out the results
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+stop
 writefits,concat_dir(outdir,'wavevec.fits'),wavevec
 writefits,concat_dir(outdir,'sumspec_all.fits'),sumspec_all
-writefits,concat_dir(outdir,'sumspec_low.fits'),sumspec_low
-writefits,concat_dir(outdir,'sumspec_high.fits'),sumspec_high
 writefits,concat_dir(outdir,'skyspec.fits'),medianskyspec
 writefits,concat_dir(outdir,'yfit_all.fits'),yfit_all
-writefits,concat_dir(outdir,'yfit_low.fits'),yfit_low
-writefits,concat_dir(outdir,'yfit_high.fits'),yfit_high
+if (nhighsn_low gt 0) then begin
+  writefits,concat_dir(outdir,'sumspec_low.fits'),sumspec_low
+  writefits,concat_dir(outdir,'yfit_low.fits'),yfit_low
+endif
+if (nhighsn_high gt 0) then begin
+  writefits,concat_dir(outdir,'sumspec_high.fits'),sumspec_high
+  writefits,concat_dir(outdir,'yfit_high.fits'),yfit_high
+endif
 
 ; Make headers for the new images
 mkhdr,hdrim,fluxmap
@@ -605,7 +647,6 @@ splog, 'Successful completion of osredx_velmap at ' + systime()
 
 ; Close logfile
 if (keyword_set(logfile)) then splog, /close
-
 
 return
 end
