@@ -134,7 +134,7 @@ end
 ; Wrapper code to the analysis
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-pro osredx_velmap,file,zsys,lrest,ltype,gfwhm=gfwhm,mincov=mincov,tag=tag,outdir=outdir,maxvel=maxvel,maxsig=maxsig,minsig=minsig,verbose=verbose,skyfile=skyfile,sncut=sncut
+pro osredx_velmap,file,zsys,lrest,ltype,gfwhm=gfwhm,mincov=mincov,tag=tag,outdir=outdir,maxvel=maxvel,maxsig=maxsig,minsig=minsig,verbose=verbose,skyfile=skyfile,sncut=sncut,writesb=writesb
 
 ; Output subdirectory
 if (~keyword_set(outdir)) then outdir='./velfit/'
@@ -398,37 +398,36 @@ for i=0,ngood-1 do begin
   if (keyword_set(verbose)) then $
     splog,'Corrected sigma: ',thesig,' km/s'
 
-  ; Remove any bad fits with zero or negative flux
-  if (theflux eq 0.) then begin
-    thevel=-999.
-    thesig=-999.
-    thevel_err=-999.
-    thesig_err=-999.
-    theflux=0.
-    thesnr=0.
-  endif
+    ; Remove any bad fits with zero or negative flux
+    if (theflux eq 0.) then begin
+      thevel=-999.
+      thesig=-999.
+      thevel_err=-999.
+      thesig_err=-999.
+      theflux=0.
+      thesnr=0.
+    endif
 
-  ; Remove bad fits with below threshhold snr
-  if ((thesnr lt sncut)or(~(finite(thesnr)))) then begin
-    thevel=-999.
-    thesig=-999.
-    thevel_err=-999.
-    thesig_err=-999.
-    theflux=0.
-    thesnr=0.
-  endif 
-
-  ; Remove bad fits within 5% of upper sigma bound
-  if (thesig gt (0.95 * maxsig)) then begin
-    thevel=-999.
-    thesig=-999.
-    thevel_err=-999.
-    thesig_err=-999.
-    theflux=0.
-    thesnr=0.
-  endif
-
-  
+    ; Remove bad fits with below threshhold snr
+    if ((thesnr lt sncut)or(~(finite(thesnr)))) then begin
+      thevel=-999.
+      thesig=-999.
+      thevel_err=-999.
+      thesig_err=-999.
+      theflux=0.
+      thesnr=0.
+    endif
+    
+    ; Remove bad fits within 5% of upper sigma bound
+    if (thesig gt (0.95 * maxsig)) then begin
+      thevel=-999.
+      thesig=-999.
+      thevel_err=-999.
+      thesig_err=-999.
+      theflux=0.
+      thesnr=0.
+    endif
+   
   velmap[goodx[i],goody[i]]=thevel
   sigmap[goodx[i],goody[i]]=thesig
   velmap_err[goodx[i],goody[i]]=thevel_err
@@ -586,12 +585,18 @@ splog,'SNR: ',theflux/dflux
 endif
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Convert flux map to surf-b map
+; in units of /arcsec^2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dx=fxpar(hdr0,'CDELT2')*3600.   ;arcsec/spaxel
+surfb=fluxmap/dx/dx/10.; 1e-16 erg/s/cm/arcsec2
 
-
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Write out the results
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-stop
+
 writefits,concat_dir(outdir,'wavevec.fits'),wavevec
 writefits,concat_dir(outdir,'sumspec_all.fits'),sumspec_all
 writefits,concat_dir(outdir,'skyspec.fits'),medianskyspec
@@ -632,6 +637,8 @@ writefits,concat_dir(outdir,'sigmap_err.fits'),sigmap_err,hdrim
 writefits,concat_dir(outdir,'snmap.fits'),snmap,hdrim
 if (keyword_set(skyfile)) then $
   writefits,concat_dir(outdir,'lsfmap.fits'),lsfmap,hdrim
+if (keyword_set(writesb)) then $
+  writefits,concat_dir(outdir,'surfbmap.fits'),surfb,hdrim
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Clean up
