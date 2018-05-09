@@ -1,7 +1,7 @@
 ; Assumes that input is wavelengths in nm, flux in 1e-18 erg/s/cm2/Ang
 ; filename must end in .ps
 
-pro osredx_specplot,filename,wave,flux,fit,sky,xrange=xrange,yrange_sci=yrange_sci,yrange_sky=yrange_sky,remove=remove
+pro osredx_specplot,filename,wave,flux,fit,sky,xrange=xrange,yrange_sci=yrange_sci,yrange_sky=yrange_sky,remove=remove,comparewave=comparewave,compareflux=compareflux
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Main science plot
@@ -21,6 +21,13 @@ dfpsplot, filename, /color,ysize=8.,xsize=8.
 
 plot,wave,flux,yrange=yrange_sci,xrange=xrange,/xstyle,/ystyle,xthick=4,ythick=4,thick=4,charthick=4,ytitle=textoidl('Flux (1e-18 erg s cm^{-2} \AA^{-1})'),XTICKFORMAT="(A1)",charsize=1.3,psym=10
 oplot,wave,fit,color=250,thick=4
+
+if (keyword_set(comparewave) and keyword_set(compareflux)) then begin
+   oplot,comparewave,compareflux,color=60,thick=4,psym=10
+   oplot,wave,flux,thick=4,psym=10
+   oplot,wave,fit,color=250,thick=4
+  ;stop
+endif
 
 ;plot,xbin_hb,hist_hb,xrange=[-50,50],/xstyle,xtitle='Delta Velocity (km/s)',ytitle='Number',charsize=1.5,xthick=6,ythick=6,thick=6,/nodata,charthick=6,yrange=[0,230],/ystyle,title='H-Beta'
 ;oplot,xbin_hb,hist_hb,thick=6,psym=10

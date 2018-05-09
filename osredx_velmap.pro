@@ -134,7 +134,7 @@ end
 ; Wrapper code to the analysis
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-pro osredx_velmap,file,zsys,lrest,ltype,gfwhm=gfwhm,mincov=mincov,tag=tag,outdir=outdir,maxvel=maxvel,maxsig=maxsig,minsig=minsig,verbose=verbose,skyfile=skyfile,sncut=sncut,writesb=writesb
+pro osredx_velmap,file,zsys,lrest,ltype,gfwhm=gfwhm,mincov=mincov,tag=tag,outdir=outdir,maxvel=maxvel,maxsig=maxsig,minsig=minsig,verbose=verbose,skyfile=skyfile,sncut=sncut,writesb=writesb,growrad=growrad
 
 ; Output subdirectory
 if (~keyword_set(outdir)) then outdir='./velfit/'
@@ -450,7 +450,16 @@ endfor
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Composite spectrum of all regions
+; Identify where we pass the SNR cut
 indx_all=where(snmap gt sncut,nhighsn_all)
+; Make a mask here
+tempmask=intarr((size(snmap))[1],(size(snmap))[2])
+if (nhighsn_all ne 0) then tempmask[indx_all]=1
+; Grow the mask
+if (~keyword_set(growrad)) then growrad=4
+tempmask=ml_growmask(tempmask,growrad)
+; Use this new mask to define regions to include
+indx_all=where(tempmask eq 1,nhighsn_all)
 ind_all=array_indices(snmap,indx_all)
 goodx_all=ind_all[0,*]
 goody_all=ind_all[1,*]
@@ -520,7 +529,8 @@ thevel=(parms_all[0]-lambda_guess)/lambda_guess*3e5
 thevel_err=(perr_all[0])/lambda_guess*3e5*sqrt(bestnorm/dof)
 thesig=(parms_all[1])/parms_all[0]*3e5
 thesig_err=perr_all[1]/parms_all[0]*3e5*sqrt(bestnorm/dof)
-splog,'Sum_all flux: ',theflux/10.,' +- ',dflux/10.,' e-16 erg/s/cm2'
+; Override flux uncertainty to 20%
+splog,'Sum_all flux: ',theflux/10.,' +- ',theflux/10./5.,' e-16 erg/s/cm2'
 splog,strcompress('Sum_all wave: '+string(parms_all[0])+' um, (z='+string(parms_all[0]/lrest-1.)+')')
 splog,'Sum_all velocity: ',thevel,' +- ',thevel_err,' km/s'
 splog,'Sum_all sigma: ',thesig,' +- ',thesig_err,' km/s'
