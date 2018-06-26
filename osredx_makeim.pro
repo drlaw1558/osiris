@@ -4,7 +4,7 @@
 ;For example,
 ;osredx_makeim,'q0100-bx172-o3.fits',gfwhm=1.5,zstart=319,zstop=330
 
-pro osredx_makeim,file,gfwhm=gfwhm,mincov=mincov,zstart=zstart,zstop=zstop,outdir=outdir
+pro osredx_makeim,file,gfwhm=gfwhm,lfwhm=lfwhm,mincov=mincov,zstart=zstart,zstop=zstop,outdir=outdir
 
 a=mrdfits(file,0,hdr0)
 covmap=mrdfits(file,3)
@@ -28,6 +28,17 @@ if (~keyword_set(zstop)) then zstop=nz-1
 ; Create output directory
 if file_test(outdir,/directory) eq 0 then spawn, '\mkdir -p '+outdir
 
+if (keyword_set(lfwhm)) then begin
+   new=b
+   for i=0,(size(b))[1]-1 do begin
+      for j=0,(size(b))[2]-1 do begin
+        new[i,j,*]=smooth(b[i,j,*],lfwhm)
+      endfor
+   endfor
+   b=new
+endif
+   
+
 c=b
 for i=0,nz-1 do begin
    newim=filter_image(b[*,*,i],fwhm_gaussian=gfwhm)
@@ -37,8 +48,11 @@ for i=0,nz-1 do begin
    c[*,*,i]=newim
 endfor
 
-test=c[*,*,zstart:zstop]
-im=median(test,dimension=3)
+if (zstart eq zstop) then im=c[*,*,zstart]
+if (zstart ne zstop) then begin
+  test=c[*,*,zstart:zstop]
+  im=median(test,dimension=3)
+endif
 d=transpose(c,[2,1,0])
 ; Write out the smoothed/masked data cube
 ;outname=ml_strreplace(file,'.fits','_smooth.fits')
