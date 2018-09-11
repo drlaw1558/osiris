@@ -34,7 +34,8 @@ function o3_twocomponent, wavevec, p
 waveo3_1=4960.30
 waveo3_2=5008.24
 
-; p[0]=strong o3 wave, p[1]=width, p[2]=strong o3 amplitude, p[3]=constant
+; p[0]=strong o3 wave, p[1]=width, p[2]=strong o3 amplitude,
+; p[3]=constant, p[4]=tilt
 wave1=p[0]*waveo3_1/waveo3_2
 wave2=p[0]
 sig1=p[1]
@@ -46,7 +47,7 @@ amp2=p[2]
 temp1=gaussian(wavevec,[amp1,wave1,sig1])
 temp2=gaussian(wavevec,[amp2,wave2,sig2])
 
-model=temp1+temp2+p[3]
+model=temp1+temp2+p[3]+p[4]*wavevec
 
 return,model
 end
@@ -57,7 +58,7 @@ end
 
 function onecomponent, wavevec, p
 
-; p[0]=wavelength, p[1]=width, p[2]=amplitude, p[3]=constant
+; p[0]=wavelength, p[1]=width, p[2]=amplitude, p[3]=constant, p[4]=tilt
 wave1=p[0]
 sig1=p[1]
 
@@ -66,7 +67,7 @@ amp1=p[2]
 ; Construct using the 'gaussian' function
 temp1=gaussian(wavevec,[amp1,wave1,sig1])
 
-model=temp1+p[3]
+model=temp1+p[3]+p[4]*wavevec
 
 return,model
 end
@@ -88,10 +89,10 @@ function fit_skyspec, wavevec, skyspec
 
   ; Set up basic boundaries for the skyline fits
   ; 4 parameters; wavelength, sigma, flux, baseline
-  parinfo = replicate({value:0.D, fixed:0, limited:[0,0], limits:[0.D,0]}, 4)
-  parinfo[*].value = [0., 3., 0.01, 0.]; starting values
+  parinfo = replicate({value:0.D, fixed:0, limited:[0,0], limits:[0.D,0]}, 5)
+  parinfo[*].value = [0., 3., 0.01, 0., 0.]; starting values
   ; Initial guess
-  parms0=[0., 3., 0.1, 0.]
+  parms0=[0., 3., 0.1, 0., 0.]
   ;Bound the velocities
   parinfo[0].limited[0] = 1
   parinfo[0].limited[1] = 1
@@ -104,13 +105,15 @@ function fit_skyspec, wavevec, skyspec
   parinfo[2].limited[0] = 1
   parinfo[2].limits[0]  = 0.D
   mockerr=replicate(1e-3,n_elements(wavevec))
+  ; No tilt
+  parinfo[4].limited[*]=1
 
   ; Loop over good skylines in the wavelength range
   goodsky=where((ohlines gt min(wavevec+50.))and(ohlines lt max(wavevec-50.)),ngood)
   allR=fltarr(ngood)
   for i=0,ngood-1 do begin
-    parinfo[*].value = [ohlines[goodsky[i]], 3., 0.01, 0.]; starting values
-    parms0=[ohlines[goodsky[i]], 3., 0.1, 0.]
+    parinfo[*].value = [ohlines[goodsky[i]], 3., 0.01, 0., 0.]; starting values
+    parms0=[ohlines[goodsky[i]], 3., 0.1, 0., 0.]
     parinfo[0].limits[0]  = ohlines[goodsky[i]]-10.
     parinfo[0].limits[1]  = ohlines[goodsky[i]]+10.
 
@@ -257,9 +260,9 @@ writefits,concat_dir(outdir,'cube_smoothed.fits'),temp,hdr0
 ; will generally replace this later)
 medianskyspec=errspec
 
-; 4 parameters; wavelength, sigma, amplitude, baseline
+; 4 parameters; wavelength, sigma, amplitude, baseline, tilt
 parinfo = replicate({value:0.D, fixed:0, limited:[0,0], $
-                       limits:[0.D,0]}, 4)
+                       limits:[0.D,0]}, 5)
 
 ; Default fitting parameters
 if (~keyword_set(maxvel)) then maxvel=1000. ; +- 1000 km/s
@@ -275,9 +278,9 @@ sigma_ll=(minsig/c)*lambda_guess; Lower limit on sigma in Angstrom
 sigma_ul=(maxsig/c)*lambda_guess; Upper limit on sigma in Angstrom
 
 ; Parameters are [wavelength, sigma, amplitude, baseline]
-parinfo[*].value = [lambda_guess, 6., 0.01, 0.]; starting values
+parinfo[*].value = [lambda_guess, 6., 0.01, 0., 0.]; starting values
 ; Initial guess
-parms0=[lambda_guess, 6., 0.1, 0.]
+parms0=[lambda_guess, 6., 0.1, 0., 0.]
 ;Bound the velocities
 parinfo[0].limited[0] = 1
 parinfo[0].limited[1] = 1
